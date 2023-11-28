@@ -1,14 +1,20 @@
-package frc.robot;
+package frc.robot.subsystems;
 
 import com.revrobotics.AbsoluteEncoder;
 import com.revrobotics.CANSparkMax;
 import com.revrobotics.RelativeEncoder;
 import com.revrobotics.SparkMaxPIDController;
+import com.revrobotics.CANSparkMax.ControlType;
 import com.revrobotics.CANSparkMax.IdleMode;
 import com.revrobotics.CANSparkMaxLowLevel.MotorType;
 import com.revrobotics.SparkMaxAbsoluteEncoder.Type;
 
-public class SwerveDrive {
+import edu.wpi.first.math.geometry.Rotation2d;
+import edu.wpi.first.math.kinematics.SwerveModulePosition;
+import edu.wpi.first.math.kinematics.SwerveModuleState;
+import frc.robot.Constants;
+
+public class MAXswerve {
     CANSparkMax drivingMotor;
     CANSparkMax turningMotor;
 
@@ -19,8 +25,9 @@ public class SwerveDrive {
     SparkMaxPIDController turningPID;
 
     double angleOffset;
+    SwerveModuleState desiredState = new SwerveModuleState(0.0, new Rotation2d());
 
-    public SwerveDrive(int DrivingMotorCanID, int turningMOtorCanID, double angleOffset){
+    public MAXswerve(int DrivingMotorCanID, int turningMOtorCanID, double angleOffset){
         drivingMotor = new CANSparkMax(DrivingMotorCanID, MotorType.kBrushless);
         turningMotor = new CANSparkMax(turningMOtorCanID, MotorType.kBrushless);
         this.angleOffset = angleOffset;
@@ -62,15 +69,43 @@ public class SwerveDrive {
         drivingEncoder.setPosition(0);
     }
 
-    public void setAngle(double angle){
-        turningPID.setReference(angle + angleOffset, CANSparkMax.ControlType.kPosition);
+    public SwerveModulePosition getPosition() {
+        // Apply chassis angular offset to the encoder position to get the position
+        // relative to the chassis.
+        return new SwerveModulePosition(
+            drivingEncoder.getPosition(),
+            new Rotation2d(turningEncoder.getPosition() - angleOffset));
     }
 
-    public void setSpeed(double speed){
-        double realSpeed = speed;
-        if(angleOffset == 0 || angleOffset == Math.PI){
-            realSpeed = realSpeed * -1;
-        }
-        drivingPID.setReference(realSpeed, CANSparkMax.ControlType.kVelocity);
+    public void setDesiredState(SwerveModuleState desiredState) {
+        // Apply chassis angular offset to the desired state.
+        SwerveModuleState correctedDesiredState = new SwerveModuleState();
+        correctedDesiredState.speedMetersPerSecond = desiredState.speedMetersPerSecond;
+        correctedDesiredState.angle = desiredState.angle.plus(Rotation2d.fromRadians(angleOffset));
+    
+        // Optimize the reference state to avoid spinning further than 90 degrees.
+        SwerveModuleState optimizedDesiredState = SwerveModuleState.optimize(correctedDesiredState,
+            new Rotation2d(turningEncoder.getPosition()));
+
+        // Command driving and turning SPARKS MAX towards their respective setpoints.
+        drivingPID.setReference(optimizedDesiredState.speedMetersPerSecond, CANSparkMax.ControlType.kVelocity);
+        turningPID.setReference(optimizedDesiredState.angle.getRadians(), CANSparkMax.ControlType.kPosition);
+    
+        this.desiredState = desiredState;
     }
+    public boolean isMoving(){
+return desiredState.speedMetersPerSecond!=0;  
+}
+    public void resetEncoders() {
+        drivingEncoder.setPosition(0);
+    }
+
+    public void setP(double P){
+        drivingPID.setP(P);
+    }
+
+    public void setForward(){
+        turningPID.setReference(0 + angleOffset, ControlType.kPosition);
+    }
+
 }

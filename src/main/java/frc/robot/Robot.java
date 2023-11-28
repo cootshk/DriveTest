@@ -4,15 +4,10 @@
 
 package frc.robot;
 
-import java.lang.ModuleLayer.Controller;
-
-import com.revrobotics.AbsoluteEncoder;
-import com.revrobotics.CANSparkMax;
-import com.revrobotics.RelativeEncoder;
-
-import edu.wpi.first.wpilibj.Joystick;
 import edu.wpi.first.wpilibj.TimedRobot;
-import edu.wpi.first.wpilibj.XboxController;
+import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
+import edu.wpi.first.wpilibj2.command.Command;
+import edu.wpi.first.wpilibj2.command.CommandScheduler;
 
 /**
  * The VM is configured to automatically run this class, and to call the functions corresponding to
@@ -21,21 +16,18 @@ import edu.wpi.first.wpilibj.XboxController;
  * project.
  */
 public class Robot extends TimedRobot {
-  XboxController controller;
+  private Command m_autonomousCommand;
+  private RobotContainer m_robotContainer;
 
-  SwerveDrive frontLeft, frontRight, backLeft, backRight;
   /**
    * This function is run when the robot is first started up and should be used for any
-   * initialization code.
+   * initialization code. 
    */
   @Override
   public void robotInit() {
-    controller = new XboxController(Constants.IO.controller);
-
-    frontLeft = new SwerveDrive(Constants.IO.frontLeftDrive, Constants.IO.frontLeftTurn, Constants.Turn.angleOffsets[1]);
-    frontRight = new SwerveDrive(Constants.IO.frontRightDrive, Constants.IO.frontRightTurn, Constants.Turn.angleOffsets[0]);
-    backLeft = new SwerveDrive(Constants.IO.backLeftDrive, Constants.IO.backLeftTurn, Constants.Turn.angleOffsets[3]);
-    backRight = new SwerveDrive(Constants.IO.backRightDrive, Constants.IO.backRightTurn, Constants.Turn.angleOffsets[2]);
+    // Instantiate our RobotContainer.  This will perform all our button bindings, and put our
+    // autonomous chooser on the dashboard.
+    m_robotContainer = new RobotContainer();
   }
 
   /**
@@ -46,83 +38,66 @@ public class Robot extends TimedRobot {
    * SmartDashboard integrated updating.
    */
   @Override
-  public void robotPeriodic() {}
+  public void robotPeriodic() {
+    // Runs the Scheduler.  This is responsible for polling buttons, adding newly-scheduled
+    // commands, running already-scheduled commands, removing finished or interrupted commands,
+    // and running subsystem periodic() methods.  This must be called from the robot's periodic
+    // block in order for anything in the Command-based framework to work.
+    CommandScheduler.getInstance().run();
+    m_robotContainer.getArmValues();
 
-  /**
-   * This autonomous (along with the chooser code above) shows how to select between different
-   * autonomous modes using the dashboard. The sendable chooser code works with the Java
-   * SmartDashboard. If you prefer the LabVIEW Dashboard, remove all of the chooser code and
-   * uncomment the getString line to get the auto name from the text box below the Gyro
-   *
-   * <p>You can add additional auto modes by adding additional comparisons to the switch structure
-   * below with additional strings. If using the SendableChooser make sure to add them to the
-   * chooser code above as well.
-   */
+  }
+
+  /** This function is called once each time the robot enters Disabled mode. */
+  @Override
+  public void disabledInit() {}
+
+  @Override
+  public void disabledPeriodic() {
+  }
+
+  /** This autonomous runs the autonomous command selected by your {@link RobotContainer} class. */
   @Override
   public void autonomousInit() {
-    
+    if(Constants.Autonomous.autoPath == 2){
+      m_autonomousCommand = m_robotContainer.getAutoBalance();
+    } else {
+      m_autonomousCommand = m_robotContainer.getAutonomousCommand();
+    }
+
+    // // schedule the autonomous command (example)
+    if (m_autonomousCommand != null) {
+      m_autonomousCommand.schedule();
+    }
   }
 
   /** This function is called periodically during autonomous. */
   @Override
-  public void autonomousPeriodic() {
-    
-  }
+  public void autonomousPeriodic() {}
 
-  /** This function is called once when teleop is enabled. */
   @Override
   public void teleopInit() {
-    //reset all of our variables
+    // This makes sure that the autonomous stops running when
+    // teleop starts running. If you want the autonomous to
+    // continue until interrupted by another command, remove
+    // this line or comment it out.
+    if (m_autonomousCommand != null) {
+      m_autonomousCommand.cancel();
+    }
+    m_robotContainer.resetGyro();
   }
 
   /** This function is called periodically during operator control. */
   @Override
   public void teleopPeriodic() {
-    if(controller.getRawButtonReleased(1)){
-      double angle = 0;
-      frontLeft.setAngle(angle);
-      frontRight.setAngle(angle);
-      backRight.setAngle(angle);
-      backLeft.setAngle(angle);
-    }
-    if(controller.getRawButtonReleased(2)){
-      double angle = Math.PI * 1.5;
-      frontLeft.setAngle(angle);
-      frontRight.setAngle(angle);
-      backRight.setAngle(angle);
-      backLeft.setAngle(angle);
-    }
-    if(controller.getRawButtonReleased(3)){
-      double angle = Math.PI * 0.5;
-      frontLeft.setAngle(angle);
-      frontRight.setAngle(angle);
-      backRight.setAngle(angle);
-      backLeft.setAngle(angle);
-    }
-    if(controller.getRawButtonReleased(4)){
-      double angle = Math.PI;
-      frontLeft.setAngle(angle);
-      frontRight.setAngle(angle);
-      backRight.setAngle(angle);
-      backLeft.setAngle(angle);
-    }
-    frontLeft.setSpeed(1);
-    frontRight.setSpeed(1); 
-    backRight.setSpeed(1);
-    backLeft.setSpeed(1);
+
   }
 
-  /** This function is called once when the robot is disabled. */
   @Override
-  public void disabledInit() {}
-
-  /** This function is called periodically when disabled. */
-  @Override
-  public void disabledPeriodic() {}
-
-  /** This function is called once when test mode is enabled. */
-  @Override
-  public void testInit() {}
+  public void testInit() {
+    // Cancels all running commands at the start of test mode.
+    CommandScheduler.getInstance().cancelAll();
+  }
 
   /** This function is called periodically during test mode. */
   @Override
